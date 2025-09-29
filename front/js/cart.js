@@ -19,10 +19,10 @@ function loadAllProductsAndDisplay() {
     }
     
     // Récupérer tous les IDs uniques
-    const uniqueIds = getUniqueProductIds()
+    const uniqueIds = getUniqueProductIds()                                           // ← On crée une fonction getUniqueProductIds() qui va nous permettre de récupérer tous les IDs uniques des produits dans le panier.
     
     // Faire un seul fetch pour tous les produits
-    fetchAllProducts(uniqueIds)
+    fetchAllProducts(uniqueIds)                                                       // ← On crée une fonction fetchAllProducts() qui va nous permettre de faire un seul fetch pour tous les produits en utilisant Promise.all. On passe les IDs uniques à cette fonction pour qu'elle puisse récupérer les données de chaque produit. uniqueIds dit : "Va chercher seulement les produits DONT ON A VRAIMENT BESOIN, sans gaspiller d'appels API en doublons (les id identiques) !"
         .then((allProducts) => {
             displayAllItems(allProducts)
             updateCartTotals(allProducts)
