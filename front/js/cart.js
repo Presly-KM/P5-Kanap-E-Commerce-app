@@ -41,7 +41,7 @@ function fetchAllProducts(productIds) {
     )
     
     // Retourner une promesse qui attend tous les fetch
-    return Promise.all(fetchPromises)
+    return Promise.all(fetchPromises)                                                  // ← On utilise Promise.all pour attendre que toutes les promesses soient résolues avant de continuer. CETTE LIGNE dit deux choses : 1."Attends que tous les fetch soient terminés" 2."Puis donne-moi TOUS les résultats en même temps"
 }
 
 function displayAllItems(allProducts) {
