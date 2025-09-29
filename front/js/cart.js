@@ -291,11 +291,12 @@ function submitForm(e) {
     })
 }
 
-function isEmailInvalid() {
+function isEmailInvalid() {                                                                                // On crée une fonction isEmailInvalid() qui va nous permettre de vérifier si l'email est valide ou non.
     const email = document.querySelector("#email").value
-    const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/
+    // Regex améliorée pour exiger une extension de domaine
+    const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]{2,})+$/
     if (regex.test(email) === false) {
-        alert("Veuillez entrer une adresse email valide (ex: nom123@domaine.com)")
+        alert("Veuillez entrer une adresse email valide avec une extension (ex: nom@domaine.com, nom@domaine.fr)")
         return true
     }
     return false
