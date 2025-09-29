@@ -36,7 +36,8 @@ function loadAllProductsAndDisplay() {
 function fetchAllProducts(productIds) {
     // Créer un tableau de promesses pour tous les produits
     const fetchPromises = productIds.map(id => 
-        fetch(`http://localhost:3000/api/products/${id}`).then(res => res.json())
+        fetch(`http://localhost:3000/api/products/${id}`)
+        .then(res => res.json())
     )
     
     // Retourner une promesse qui attend tous les fetch
