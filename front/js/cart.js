@@ -1,33 +1,70 @@
-const cart = []                                                            // On crée un tableau vide qui va nous permettre de stocker les produits du panier.
+const cart = []
 
 retrieveItemsFromStorage()
-displayAllItems()
-setupOrderButton()                                                         // On appelle la fonction retrieveItemsFromStorage() pour récupérer les produits du panier dans le localStorage et les afficher sur la page. Puis on appelle la fonction displayAllItems() pour afficher tous les produits du panier sur la page. Enfin on appelle la fonction setupOrderButton() pour configurer le bouton de commande.
+loadAllProductsAndDisplay()
 
-function retrieveItemsFromStorage() {                                      // On crée une fonction retrieveItemsFromStorage() qui va nous permettre de récupérer les produits du panier dans le localStorage.
-    const cartData = localStorage.getItem('kanapCart')                     // On récupère les données du panier dans le localStorage. On utilise la méthode getItem() de l'interface Storage pour récupérer les données du panier qui sont stockées sous la clé 'kanapCart'. On assigne ces données à la variable cartData.
-    if (cartData) {                                                        // Si les données du panier existent dans le localStorage...
-        const parsedCart = JSON.parse(cartData)                            // ...on les transforme en objet JavaScript avec la méthode JSON.parse() et on les assigne à la variable parsedCart.
-        parsedCart.forEach(item => cart.push(item))                        // Pour chaque élément (item) récupéré depuis le localStorage (et ayant été parsé par const parsedCart), on l'ajoute au tableau cart avec la méthode push().
+function retrieveItemsFromStorage() {
+    const cartData = localStorage.getItem('kanapCart')
+    if (cartData) {
+        const parsedCart = JSON.parse(cartData)
+        parsedCart.forEach(item => cart.push(item))
     }
 }
- 
-function displayAllItems() {                                               // On crée une fonction displayAllItems() qui va nous permettre d'afficher tous les produits du panier sur la page.
-    cart.forEach((item) => {                                               // Pour chaque élément (item) dans le tableau cart...
-        displaySingleItem(item)                                            // ...on appelle la fonction displaySingleItem() pour afficher cet élément sur la page.
+
+function loadAllProductsAndDisplay() {
+    if (cart.length === 0) {
+        displayEmptyCart()
+        setupOrderButton()
+        return
+    }
+    
+    // Récupérer tous les IDs uniques
+    const uniqueIds = getUniqueProductIds()
+    
+    // Faire un seul fetch pour tous les produits
+    fetchAllProducts(uniqueIds)
+        .then((allProducts) => {
+            displayAllItems(allProducts)
+            updateCartTotals(allProducts)
+            setupOrderButton()
+        })
+        .catch((error) => {
+            console.error('Erreur:', error)
+        })
+}
+
+function fetchAllProducts(productIds) {
+    // Créer un tableau de promesses pour tous les produits
+    const fetchPromises = productIds.map(id => 
+        fetch(`http://localhost:3000/api/products/${id}`).then(res => res.json())
+    )
+    
+    // Retourner une promesse qui attend tous les fetch
+    return Promise.all(fetchPromises)
+}
+
+function displayAllItems(allProducts) {
+    const cartItemsSection = document.querySelector("#cart__items")
+    cartItemsSection.innerHTML = ''
+    
+    cart.forEach((item) => {
+        // Trouver le produit correspondant dans les données chargées
+        const product = allProducts.find(p => p._id === item.id)
+        if (product) {
+            displaySingleItem(item, product)
+        }
     })
-    updateCartTotals()                                                     // On appelle la fonction updateCartTotals() pour mettre à jour le total des quantités et des prix du panier.
 }
 
-function displaySingleItem(item) {                                         // On crée une fonction displaySingleItem() qui va nous permettre d'afficher un seul produit du panier sur la page. On lui passe en paramètre l'élément (item) à afficher.
-    const article = createArticleElement(item)                             // On crée l'élément <article> pour le produit du panier en appelant la fonction createArticleElement() et on l'affiche sur la page en appelant la fonction displayArticleOnPage().
-    displayArticleOnPage(article)                                          // On affiche l'élément <article> sur la page en appelant la fonction displayArticleOnPage().
+function displaySingleItem(item, product) {
+    const article = createArticleElement(item, product)
+    displayArticleOnPage(article)
 }
 
-function createArticleElement(item) {                                      // On crée une fonction createArticleElement() qui va nous permettre de créer l'élément <article> pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function createArticleElement(item, product) {
     const article = makeArticle(item)
-    const imageDiv = createImageSection(item)
-    const contentDiv = createContentSection(item)
+    const imageDiv = createImageSection(product) // ← Données déjà disponibles
+    const contentDiv = createContentSection(item, product) // ← Données déjà disponibles
     
     article.appendChild(imageDiv)
     article.appendChild(contentDiv)
@@ -35,24 +72,23 @@ function createArticleElement(item) {                                      // On
     return article
 }
 
-function createImageSection(item) {                                        // On crée une fonction createImageSection() qui va nous permettre de créer la section image pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
-    return makeImageDiv(item)                                              // Ici 
+function createImageSection(product) {
+    const div = document.createElement("div")
+    div.classList.add("cart__item__img")
+
+    const image = document.createElement("img")
+    image.src = product.imageUrl
+    image.alt = product.altTxt
+    div.appendChild(image)
+
+    return div
 }
 
-function createContentSection(item) {                                      // On crée une fonction createContentSection() qui va nous permettre de créer la section contenu pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
-    return makeCartContent(item)
-}
-
-function setupOrderButton() {                                              // On crée une fonction setupOrderButton() qui va nous permettre de configurer le bouton de commande.
-    const orderButton = document.querySelector("#order")
-    orderButton.addEventListener("click", (e) => submitForm(e))
-}
-
-function makeCartContent(item) {                                           // On crée une fonction makeCartContent() qui va nous permettre de créer la section contenu pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function createContentSection(item, product) {
     const cardItemContent = document.createElement("div")
     cardItemContent.classList.add("cart__item__content")
 
-    const description = makeDescription(item)
+    const description = makeDescription(item, product) // ← Données déjà disponibles
     const settings = makeSettings(item)
 
     cardItemContent.appendChild(description)
@@ -60,7 +96,31 @@ function makeCartContent(item) {                                           // On
     return cardItemContent
 }
 
-function makeSettings(item) {                                              // On crée une fonction makeSettings() qui va nous permettre de créer la section paramètres pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function makeDescription(item, product) {
+    const description = document.createElement("div")
+    description.classList.add("cart__item__content__description")
+
+    // Plus besoin de fetch - les données sont déjà là
+    const h2 = document.createElement("h2")
+    h2.textContent = product.name
+    const p = document.createElement("p")
+    p.textContent = item.color
+    const p2 = document.createElement("p")
+    p2.textContent = (product.price * item.quantity).toFixed(2) + " €"
+
+    description.appendChild(h2)
+    description.appendChild(p)
+    description.appendChild(p2)
+
+    return description
+}
+
+function setupOrderButton() {
+    const orderButton = document.querySelector("#order")
+    orderButton.addEventListener("click", (e) => submitForm(e))
+}
+
+function makeSettings(item) {
     const settings = document.createElement("div")
     settings.classList.add("cart__item__content__settings")
 
@@ -69,7 +129,7 @@ function makeSettings(item) {                                              // On
     return settings
 }
 
-function setupDeleteSection(settings, item) {                              // On crée une fonction setupDeleteSection() qui va nous permettre de créer la section supprimer pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function setupDeleteSection(settings, item) {
     const div = document.createElement("div")
     div.classList.add("cart__item__content__settings__delete")
     div.addEventListener("click", () => handleItemDeletion(item))
@@ -79,22 +139,22 @@ function setupDeleteSection(settings, item) {                              // On
     settings.appendChild(div)
 }
 
-function handleItemDeletion(item) {                                                                          // On crée une fonction handleItemDeletion() qui va nous permettre de gérer la suppression d'un produit du panier. On lui passe en paramètre l'élément (item) à supprimer.
-    const itemToDelete = cart.findIndex((product) => product.id === item.id && product.color === item.color) // On cherche l'index de l'élément (item) à supprimer dans le tableau cart en utilisant la méthode findIndex(). On compare l'id et la couleur pour être sûr de trouver le bon élément.
-    cart.splice(itemToDelete, 1)                                                                             // On supprime l'élément (item) du tableau cart en utilisant la méthode splice() avec l'index trouvé précédemment.
-    updateCartTotals()
+function handleItemDeletion(item) {
+    const itemToDelete = cart.findIndex((product) => product.id === item.id && product.color === item.color)
+    cart.splice(itemToDelete, 1)
     removeItemFromStorage(item)
     removeItemFromPage(item)
+    loadAllProductsAndDisplay() // Recharger avec un seul fetch
 }
 
-function removeItemFromPage(item) {                                                                          // On crée une fonction removeItemFromPage() qui va nous permettre de supprimer un produit du panier de la page. On lui passe en paramètre l'élément (item) à supprimer.
+function removeItemFromPage(item) {
     const articleToDelete = document.querySelector(`article[data-id="${item.id}"][data-color="${item.color}"]`)
     if (articleToDelete) {
         articleToDelete.remove()
     }
 }
 
-function setupQuantitySection(settings, item) {                                                              // On crée une fonction setupQuantitySection() qui va nous permettre de créer la section quantité pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function setupQuantitySection(settings, item) {
     const quantity = document.createElement("div")
     quantity.classList.add("cart__item__content__settings__quantity")
     const p = document.createElement("p")
@@ -113,146 +173,93 @@ function setupQuantitySection(settings, item) {                                 
     settings.appendChild(quantity)
 }
 
-function handleQuantityChange(id, color, newValue) {                                                        // On crée une fonction handleQuantityChange() qui va nous permettre de gérer concernant les produits dans le panier le changement de quantité et le total affiché de manière simultanée .On lui passe en paramètre l'id, la couleur et la nouvelle valeur de la quantité.
+function handleQuantityChange(id, color, newValue) {
     const itemToUpdate = cart.find((item) => item.id === id && item.color === color)
-    if (itemToUpdate) {                                                                                     // Si l'élément (item) à mettre à jour existe dans le tableau cart...
-        itemToUpdate.quantity = Number(newValue)                                                            // ...on met à jour la quantité en convertissant la nouvelle valeur en nombre avec la fonction Number().
-        updateCartTotals()                                                                                  // On met à jour le total des quantités et des prix du panier en appelant la fonction updateCartTotals().
-        saveItemToStorage(itemToUpdate)                                                                     // On sauvegarde l'élément (item) mis à jour dans le localStorage en appelant la fonction saveItemToStorage().
+    if (itemToUpdate) {
+        itemToUpdate.quantity = Number(newValue)
+        saveItemToStorage(itemToUpdate)
+        loadAllProductsAndDisplay() // Recharger avec un seul fetch
     }
 }
 
-function removeItemFromStorage(item) {                                                                      // On crée une fonction removeItemFromStorage() qui va nous permettre de supprimer un produit du panier dans le localStorage. On lui passe en paramètre l'élément (item) à supprimer.
+function removeItemFromStorage(item) {
     const cartData = localStorage.getItem('kanapCart')
-    let cart = cartData ? JSON.parse(cartData) : []                                                         // On récupère les données du panier dans le localStorage. On utilise la méthode getItem() de l'interface Storage pour récupérer les données du panier qui sont stockées sous la clé 'kanapCart'. On assigne ces données à la variable cartData. Si les données du panier existent, on les transforme en objet JavaScript avec la méthode JSON.parse() et on les assigne à la variable cart. Sinon, on initialise cart comme un tableau vide.
+    let cart = cartData ? JSON.parse(cartData) : []
     
-    const updatedCart = cart.filter(cartItem =>                                                             // On crée un nouveau tableau updatedCart en filtrant le tableau cart pour ne garder que les éléments (cartItem) qui ne correspondent pas à l'élément (item) à supprimer.
+    const updatedCart = cart.filter(cartItem => 
         !(cartItem.id === item.id && cartItem.color === item.color)
     )
     
-    localStorage.setItem('kanapCart', JSON.stringify(updatedCart))                                          // On enregistre les données du panier mises à jour dans le localStorage en utilisant la méthode setItem() de l'interface Storage. On transforme l'objet updatedCart en chaîne JSON avec la méthode JSON.stringify() et on le stocke sous la clé 'kanapCart'.
+    localStorage.setItem('kanapCart', JSON.stringify(updatedCart))
 }
 
-function saveItemToStorage(updatedItem) {                                                                   // On crée une fonction saveItemToStorage() qui va nous permettre de sauvegarder un produit du panier dans le localStorage. On lui passe en paramètre l'élément (updatedItem) à sauvegarder.
-    const cartData = localStorage.getItem('kanapCart')                                                   
+function saveItemToStorage(updatedItem) {
+    const cartData = localStorage.getItem('kanapCart')
     let cart = cartData ? JSON.parse(cartData) : []
     
-    const itemIndex = cart.findIndex(cartItem =>                                                            // On cherche l'index de l'élément (updatedItem) à mettre à jour dans le tableau cart en utilisant la méthode findIndex(). On compare l'id et la couleur pour être sûr de trouver le bon élément.
+    const itemIndex = cart.findIndex(cartItem => 
         cartItem.id === updatedItem.id && cartItem.color === updatedItem.color
     )
     
-    if (itemIndex > -1) {                                                                                   // Si l'élément (updatedItem) à mettre à jour existe dans le tableau cart (si l'index est supérieur à -1)...
-        cart[itemIndex].quantity = updatedItem.quantity                                                     // ...on met à jour la quantité de l'élément (updatedItem) dans le tableau cart.
-        localStorage.setItem('kanapCart', JSON.stringify(cart))                                             // On enregistre les données du panier mises à jour dans le localStorage en utilisant la méthode setItem() de l'interface Storage. On transforme l'objet cart en chaîne JSON avec la méthode JSON.stringify() et on le stocke sous la clé 'kanapCart'.
+    if (itemIndex > -1) {
+        cart[itemIndex].quantity = updatedItem.quantity
+        localStorage.setItem('kanapCart', JSON.stringify(cart))
     }
 }
 
-function makeDescription(item) {                                                                            // On crée une fonction makeDescription() qui va nous permettre de créer la section description pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
-    const description = document.createElement("div")
-    description.classList.add("cart__item__content__description")
-
-    fetch(`http://localhost:3000/api/products/${item.id}`)                                                  // On utilise la méthode fetch() pour faire une requête HTTP GET à l'API pour récupérer les données du produit avec l'id spécifié dans l'élément (item) à afficher.
-        .then((response) => response.json())
-        .then((product) => {                                                                                // Quand on reçoit la réponse de l'API, on la transforme en JSON et on l'utilise pour créer les éléments HTML.
-            const h2 = document.createElement("h2")
-            h2.textContent = product.name
-            const p = document.createElement("p")
-            p.textContent = item.color
-            const p2 = document.createElement("p")
-            p2.textContent = (product.price * item.quantity).toFixed(2) + " €"                              // On récupère ici le prix du produit depuis l'API et on le multiplie par la quantité pour obtenir le prix total.
-
-            description.appendChild(h2)
-            description.appendChild(p)
-            description.appendChild(p2)                                                                      // On crée les éléments HTML pour afficher le nom, la couleur et le prix total (prix * quantité) du produit. On utilise toFixed(2) pour afficher le prix avec 2 décimales.
-        })
-        .catch((error) => {
-            console.error('Erreur:', error)
-        })
-
-    return description
-}
-
-function displayArticleOnPage(article) {                                                                     // On crée une fonction displayArticleOnPage() qui va nous permettre d'afficher un produit du panier sur la page. On lui passe en paramètre l'élément <article> à afficher.
-    const cartItemsContainer = document.querySelector("#cart__items")                                        // On récupère le conteneur des articles du panier sur la page et on l'assigne à la variable cartItemsContainer.
-    if (cartItemsContainer) {                                                                                // Si le conteneur des articles du panier existe sur la page...
-        cartItemsContainer.appendChild(article)                                                              // On ajoute l'élément <article> en tant qu'enfant du conteneur des articles du panier ("#cart__items") sur la page.
+function displayArticleOnPage(article) {
+    const cartItemsContainer = document.querySelector("#cart__items")
+    if (cartItemsContainer) {
+        cartItemsContainer.appendChild(article)
     }
 }
 
-function makeArticle(item) {                                                                                 // On crée une fonction makeArticle() qui va nous permettre de créer l'élément <article> pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
+function makeArticle(item) {
     const article = document.createElement("article")
     article.classList.add("cart__item")
-    article.dataset.id = item.id                                                                             // On utilise dataset pour ajouter des attributs data-id et data-color à l'élément <article> pour pouvoir les utiliser plus tard (par exemple pour la suppression ou la modification de la quantité).
-    article.dataset.color = item.color                                                                       // On utilise dataset pour ajouter des attributs data-id et data-color à l'élément <article> pour pouvoir les utiliser plus tard (par exemple pour la suppression ou la modification de la quantité).
+    article.dataset.id = item.id
+    article.dataset.color = item.color
     return article
 }
 
-function makeImageDiv(item) {                                                                                // On crée une fonction makeImageDiv() qui va nous permettre de créer la section image pour un produit du panier. On lui passe en paramètre l'élément (item) à afficher.
-    const div = document.createElement("div")
-    div.classList.add("cart__item__img")
-
-    fetch(`http://localhost:3000/api/products/${item.id}`)                                                   // On utilise la méthode fetch() pour faire une requête HTTP GET à l'API pour récupérer les données du produit avec l'id spécifié dans l'élément (item) à afficher.
-        .then((response) => response.json())
-        .then((product) => {                                                                                 // Quand on reçoit la réponse de l'API, on la transforme en JSON et on crée l'élément <img> pour afficher l'image du produit.
-            const image = document.createElement("img")
-            image.src = product.imageUrl
-            image.alt = product.altTxt
-            div.appendChild(image)                                                                           // On utilise la méthode fetch() pour faire une requête HTTP GET à l'API pour récupérer les données du produit avec l'id spécifié dans l'élément (item) à afficher. Quand on reçoit la réponse de l'API, on la transforme en JSON et on crée l'élément <img> pour afficher l'image du produit. On utilise les propriétés imageUrl et altTxt du produit pour définir les attributs src et alt de l'élément <img>. Enfin, on ajoute l'élément <img> à la div créée précédemment.
-        })
-        .catch((error) => {
-            console.error('Erreur:', error)
-        })
-
-    return div
-}
-
-function updateCartTotals() {                                                                                // On crée une fonction updateCartTotals() qui va nous permettre de mettre à jour le total des quantités et des prix du panier.
+function updateCartTotals(allProducts) {
     calculateTotalQuantity()
-    calculateTotalPrice()
+    calculateTotalPrice(allProducts) // ← Données déjà disponibles
 }
 
 function calculateTotalQuantity() {
-    const totalQuantity = document.querySelector("#totalQuantity")                                           // On récupère l'élément qui affiche le total des quantités sur la page et on l'assigne à la variable totalQuantity.
+    const totalQuantity = document.querySelector("#totalQuantity")
     const total = cart.reduce((total, item) => total + item.quantity, 0)
     if (totalQuantity) {
         totalQuantity.textContent = total
     }
 }
 
-function calculateTotalPrice() {                                                                            // On crée une fonction calculateTotalPrice() qui va nous permettre de calculer le total des prix du panier.
+function calculateTotalPrice(allProducts) {
     const totalPrice = document.querySelector("#totalPrice")
     
     let total = 0
-    let itemsProcessed = 0
     
-    if (cart.length === 0) {
-        if (totalPrice) {
-            totalPrice.textContent = "0.00"
+    cart.forEach((item) => {
+        const product = allProducts.find(p => p._id === item.id)
+        if (product) {
+            total += product.price * item.quantity
         }
-        return
-    }
-    
-    cart.forEach((item) => {                                                                               // Pour chaque élément (item) dans le tableau cart...
-        fetch(`http://localhost:3000/api/products/${item.id}`)                                             // ...on utilise la méthode fetch() pour faire une requête HTTP GET à l'API pour récupérer les données du produit avec l'id spécifié dans l'élément (item) à afficher.
-            .then((response) => response.json())
-            .then((product) => {                                                                           // Quand on reçoit la réponse de l'API, on la transforme en JSON et on utilise les données du produit pour calculer le total des prix du panier. Ainsi, on utilise la propriété price du produit et la quantité de l'élément (item) pour calculer le prix total de cet élément (item) et on l'ajoute au total général.
-                total += product.price * item.quantity                                                     // On ajoute le prix total de l'élément (item) c'est-à-dire (prix * quantité) au total général.
-                itemsProcessed++                                                                           // On incrémente le nombre d'éléments (items) traités. Cela nous permet de savoir quand tous les éléments (items) ont été traités.
-                if (itemsProcessed === cart.length && totalPrice) {                                        // Si tous les éléments (items) ont été traités (si le nombre d'éléments (items) traités est égal à la longueur du tableau cart) et que l'élément qui affiche le total des prix existe sur la page... 
-                    totalPrice.textContent = total.toFixed(2)                                              // ...on met à jour le total des prix sur la page en utilisant toFixed(2) pour afficher le prix avec 2 décimales.
-                }
-            })
-            .catch((error) => {                                                                            // Si une erreur se produit lors de la requête fetch()...
-                console.error('Erreur:', error)                                                            // ...on affiche l'erreur dans la console.
-                itemsProcessed++                                                                           // On incrémente le nombre d'éléments (items) traités. Cela nous permet de savoir quand tous les éléments (items) ont été traités même si une erreur s'est produite.
-                if (itemsProcessed === cart.length && totalPrice) {                                        // Si tous les éléments (items) ont été traités (si le nombre d'éléments (items) traités est égal à la longueur du tableau cart) et que l'élément qui affiche le total des prix existe sur la page...
-                    totalPrice.textContent = total.toFixed(2)                                              // ...on met à jour le total des prix sur la page en utilisant toFixed(2) pour afficher le prix avec 2 décimales.
-                }
-            })
     })
+    
+    if (totalPrice) {
+        totalPrice.textContent = total.toFixed(2)
+    }
 }
 
-function submitForm(e) {                                                                                   // On crée une fonction submitForm() qui va nous permettre de gérer la soumission du formulaire de commande. On lui passe en paramètre l'événement (e) déclenché par le clic sur le bouton de commande.
+function displayEmptyCart() {
+    const cartItemsSection = document.querySelector("#cart__items")
+    cartItemsSection.innerHTML = '<p>Votre panier est vide</p>'
+    document.querySelector("#totalQuantity").textContent = "0"
+    document.querySelector("#totalPrice").textContent = "0.00"
+}
+
+function submitForm(e) {
     e.preventDefault()
     if (cart.length === 0) {
         alert("Veuillez sélectionner des articles à acheter")
@@ -264,37 +271,36 @@ function submitForm(e) {                                                        
 
     const body = prepareOrderData()
     
-    fetch("http://localhost:3000/api/products/order", {                                                    // On utilise la méthode fetch() pour faire une requête HTTP POST à l'API pour envoyer les données de la commande.
+    fetch("http://localhost:3000/api/products/order", {
         method: "POST",
         body: JSON.stringify(body),
         headers: {
             "Content-Type": "application/json"
         }
     })
-    .then((res) => res.json())                                                                             // Quand on reçoit la réponse de l'API, on la transforme en JSON.
+    .then((res) => res.json())
     .then((data) => {
         const orderId = data.orderId
         localStorage.removeItem('kanapCart')
-        window.location.href = "confirmation.html?orderId=" + orderId                                      // On redirige l'utilisateur vers la page de confirmation de commande en passant l'orderId en paramètre d'URL.
+        window.location.href = "confirmation.html?orderId=" + orderId
     })
-    .catch((err) => {                                                                                      // Gestion des erreurs
+    .catch((err) => {
         console.error(err)
         alert("Erreur lors de la commande")
     })
 }
 
-function isEmailInvalid() {                                                                                // On crée une fonction isEmailInvalid() qui va nous permettre de vérifier si l'email est valide ou non.
+function isEmailInvalid() {
     const email = document.querySelector("#email").value
-    // Regex améliorée pour exiger une extension de domaine
-    const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]{2,})+$/
+    const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/
     if (regex.test(email) === false) {
-        alert("Veuillez entrer une adresse email valide avec une extension (ex: nom@domaine.com, nom@domaine.fr)")
+        alert("Veuillez entrer une adresse email valide (ex: nom123@domaine.com)")
         return true
     }
     return false
 }
 
-function isFormInvalid() {                                                                                 // On crée une fonction isFormInvalid() qui va nous permettre de vérifier si le formulaire est valide ou non.
+function isFormInvalid() {
     const form = document.querySelector(".cart__order__form")
     const inputs = form.querySelectorAll("input")
     
@@ -336,7 +342,7 @@ function isFormInvalid() {                                                      
     return false
 }
 
-function prepareOrderData() {                                                                             // On crée une fonction prepareOrderData() qui va nous permettre de préparer les données de la commande à envoyer à l'API.
+function prepareOrderData() {
     const form = document.querySelector(".cart__order__form")
     const firstName = form.elements.firstName.value
     const lastName = form.elements.lastName.value
@@ -357,11 +363,11 @@ function prepareOrderData() {                                                   
     return body
 }
 
-function getUniqueProductIds() {                                                                           // On crée une fonction getUniqueProductIds() qui va nous permettre de récupérer les ids uniques des produits du panier.
+function getUniqueProductIds() {
     const uniqueIds = []
-    cart.forEach(item => {                                                                                 // Pour chaque élément (item) dans le tableau cart...
-        if (!uniqueIds.includes(item.id)) {                                                                // Si l'id de l'élément (item) n'est pas déjà dans le tableau uniqueIds...
-            uniqueIds.push(item.id)                                                                        // ...on l'ajoute au tableau uniqueIds.
+    cart.forEach(item => {
+        if (!uniqueIds.includes(item.id)) {
+            uniqueIds.push(item.id)
         }
     })
     return uniqueIds
